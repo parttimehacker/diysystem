@@ -7,6 +7,8 @@ import socket
 
 import psutil
 
+from gpiozero import CPUTemperature
+
 class SystemUtility():
     ''' Check and publish process status information '''
 
@@ -22,6 +24,13 @@ class SystemUtility():
         topic = "diyhas/"+self.host+"/cpu"
         value = psutil.cpu_percent(interval=1)
         info = "{0:.1f}".format(value)
+        self.client.publish(topic, str(info), 0, True)
+
+    def get_cpu_temperature(self,):
+        ''' publish cpu temperature in celsius '''
+        topic = "diyhas/"+self.host+"/cpucelsius"
+        cpu = CPUTemperature()
+        info = "{0:.1f}".format(cpu.temperature)
         self.client.publish(topic, str(info), 0, True)
 
     def get_memory(self,):
@@ -52,6 +61,7 @@ class SystemUtility():
     def check_system_status(self,):
         ''' collect and publish four system status values '''
         self.get_cpu()
+        self.get_cpu_temperature()
         self.get_memory()
         self.get_disk()
         self.get_up_time()
