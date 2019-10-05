@@ -5,7 +5,11 @@ import time
 
 import paho.mqtt.client as mqtt
 
+import diyoled128x64
+
 import sysutility
+
+OLED = diyoled128x64.DiyOLED128x64()
 
 def check_system_status(utility):
     ''' display systems status '''
@@ -37,12 +41,17 @@ def check_for_timed_events(utility):
 
 def system_message(msg):
     """ process system messages"""
-    print("msg.payload=", msg.payload)
+    global SYSUTILITY
     if msg.topic == 'diyhas/system/who':
         if msg.payload == b'ON':
-            print("who ON")
+            OLED.set(0, SYSUTILITY.host + ": " + SYSUTILITY.ip_address)
+            OLED.set(1, "U: an    R: buster")
+            OLED.set(2, "C: " + SYSUTILITY.cpu + "% " + SYSUTILITY.celsius + "C ")
+            OLED.set(3, "M: " + SYSUTILITY.memory + "MB A: " + SYSUTILITY.available + "MB")
+            OLED.set(4, "D: " + SYSUTILITY.disk + "GB F: " + SYSUTILITY.free + "GB")
+            OLED.show()
         else:
-            print("who OFF")
+            OLED.clear()
 
 # use a dispatch model for the subscriptions
 TOPIC_DISPATCH_DICTIONARY = {
@@ -57,24 +66,28 @@ TOPIC_DISPATCH_DICTIONARY = {
 # The callback for when the client receives a CONNACK response from the server
 def on_connect(client, userdata, flags, rcdata):
     """ if we lose the connection & reconnect, subscriptions will be renewed """
-    print("userdata=%s flags=%s rcdata=%s", userdata, flags, rcdata)
     client.subscribe("diyhas/system/fire", 1)
     client.subscribe("diyhas/system/panic", 1)
     client.subscribe("diyhas/system/who", 1)
 
+def on_disconnect(client, userdata, rc):
+    client.connected_flag=False
+    client.disconnect_flag=True
+
 # The callback for when a PUBLISH message is received from the server
 def on_message(client, userdata, msg):
     """ dispatch to the appropriate MQTT topic handler """
-    print("userdata=", userdata)
-    TOPIC_DISPATCH_DICTIONARY[msg.topic]["method"](client, msg)
-
+    TOPIC_DISPATCH_DICTIONARY[msg.topic]["method"](msg)
 
 if __name__ == '__main__':
 
+    global SYSUTILITY
+
     CLIENT = mqtt.Client()
     CLIENT.on_connect = on_connect
+    CLIENT.on_disconnect = on_disconnect
     CLIENT.on_message = on_message
-    CLIENT.connect("192.168.1.133", 1883, 60)
+    CLIENT.connect("192.168.1.17", 1883, 60)
     CLIENT.loop_start()
 
     SYSUTILITY = sysutility.SystemUtility(CLIENT)

@@ -15,7 +15,18 @@ class SystemUtility():
     def __init__(self, client):
         ''' server system status monitor thread with MQTT reporting '''
         self.client = client
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        #connect to any target website
+        sock.connect(('google.com', 0))
         self.host = socket.gethostname()
+        self.ip_address = sock.getsockname()[0]
+        sock.close()
+        self.cpu = "0.0"
+        self.memory = "0.0"
+        self.available = "0.0"
+        self.free = "0.0"
+        self.disk = "0.0"
+        self.celsius = "0.0"
         self.boot_time = datetime.datetime.fromtimestamp(psutil.boot_time())
         self.running_since = self.boot_time.strftime("%d. %B %Y")
 
@@ -25,6 +36,7 @@ class SystemUtility():
         value = psutil.cpu_percent(interval=1)
         info = "{0:.1f}".format(value)
         self.client.publish(topic, str(info), 0, True)
+        self.cpu = info
 
     def get_cpu_temperature(self,):
         ''' publish cpu temperature in celsius '''
@@ -32,20 +44,27 @@ class SystemUtility():
         cpu = CPUTemperature()
         info = "{0:.1f}".format(cpu.temperature)
         self.client.publish(topic, str(info), 0, True)
+        self.celsius = info
 
     def get_memory(self,):
         ''' publish memory use as a percentage '''
         topic = "diyhas/"+self.host+"/memory"
-        value = psutil.virtual_memory()[2]
-        info = "{0:.1f}".format(value)
-        self.client.publish(topic, str(info), 0, True)
+        mem = psutil.virtual_memory()
+        # Divide from Bytes -> KB -> MB
+        self.available = str(round(mem.available/1024.0/1024.0,1))
+        self.memory = str(round(mem.total/1024.0/1024.0,1))
+        #info = "{0:.1f}".format(self.available)
+        self.client.publish(topic, self.memory, 0, True)
 
     def get_disk(self,):
         ''' publish disk space used as a percentage '''
         topic = "diyhas/"+self.host+"/disk"
-        value = psutil.disk_usage('/')[3]
-        info = "{0:.1f}".format(value)
-        self.client.publish(topic, str(info), 0, True)
+        disk = psutil.disk_usage('/')
+        # Divide from Bytes -> KB -> MB -> GB
+        self.free = str(round(disk.free/1024.0/1024.0/1024.0,1))
+        self.disk = str(round(disk.total/1024.0/1024.0/1024.0,1))
+        #info = "{0:.1f}".format(self.free)
+        self.client.publish(topic, self.free, 0, True)
 
     def get_up_time(self,):
         ''' publish up time in days, hours, minutes and seconds '''
